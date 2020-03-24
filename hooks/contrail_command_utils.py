@@ -47,6 +47,16 @@ def get_context():
     ctx["contrail_container_tag"] = config.get("contrail-container-tag")
     ctx["install_docker"] = config.get("install-docker")
 
+    ctx["delete_db"] = config.get("delete-db")
+    ctx["persist_rules"] = config.get("persist-rules")
+    ctx["juju_controller"] = config.get("juju-controller")
+    ctx["juju_cacert_path"] = config.get("juju-cacert-path")
+    ctx["juju_model_id"] = config.get("juju-model-id")
+    ctx["juju_controller_password"] = config.get("juju-controller-password")
+    ctx["juju_controller_user"] = config.get("juju-controller-user")
+
+    ctx.update(common_utils.json_loads(config.get("orchestrator_info"), dict()))
+
     log("CTX: {}".format(ctx))
     return ctx
 
@@ -73,23 +83,9 @@ def deploy_ccd_code(image, tag):
         copy_tree(tmp_folder, dst)
 
         shutil.rmtree(tmp_folder, ignore_errors=True)
-        check_call(['sed', '-i', 's/connection: ssh/connection: local/g', '/' + image + '/playbooks/roles/generate_configs/templates/command_servers.yml.j2'])
     finally:
         docker_utils.remove_container_by_image(image)
 
-
-def update_charm_status():
-    tag = config.get('image-tag')
-
-    ctx = get_context()
-    changed = common_utils.render_and_log("min_config.yaml",
-        '/cluster_config.yml', ctx)
-    if changed:
-        for image in IMAGES:
-            deploy_ccd_code(image, tag)
-
-        dst='/' + image
-        check_call('export HOME=/root; ' + dst + '/docker/deploy_contrail_command', shell=True)
 
 def update_status():
     command_ip = config.get("command-ip")
@@ -105,3 +101,30 @@ def update_status():
     status_set("active", "Unit is ready")
     return True
 
+
+def update_charm_status(import_cluster=False):
+    tag = config.get('image-tag')
+
+    ctx = get_context()
+
+    if not ctx.get("cloud_orchestrator"):
+        status_set('blocked',
+                   'Missing cloud orchestrator info in relations.')
+        return
+    if ctx.get("cloud_orchestrator") != "openstack":
+        status_set('blocked',
+                   'Contrail command works with openstack only now')
+        return
+
+    changed = common_utils.render_and_log("min_config.yaml",
+        '/cluster_config.yml', ctx)
+    env = common_utils.render_and_log("juju_environment",
+        '/tmp/juju_environment', ctx)
+    if changed or env or import_cluster:
+        for image in IMAGES:
+            deploy_ccd_code(image, tag)
+
+            dst='/' + image
+            check_call('. /tmp/juju_environment ; ' + dst + '/docker/deploy_contrail_command', shell=True)
+
+    update_status()

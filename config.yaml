@@ -25,7 +25,42 @@ options:
       If we need docker to be installed
     default: true
 
-
+  delete-db:
+    type: boolean
+    description: |
+      new installation of Contrail Command (default mode) or
+      upgrade of Contrail Command (PostgreSQL database is not deleted)
+    default: true
+  persist-rules:
+    type: boolean
+    description: |
+      if iptables rules are persistent across reboots
+    default: false
+  juju-controller:
+    type: string
+    description: |
+      IP address of JuJu controller
+      may be found by command `juju show-controller` (api-endpoints)
+  juju-cacert-path:
+    type: string
+    description: |
+      the path to JuJu CA certificate
+      CA cert may be found by command `juju show-controller` (ca-cert)
+  juju-model-id:
+    type: string
+    description: |
+      ID of JuJu model
+      may be found by command `juju show-controller` (model-uuid)
+  juju-controller-password:
+    type: string
+    description: |
+      password to JuJu controller
+      should be set with `juju change-user-password` if is not set
+  juju-controller-user:
+    type: string
+    description:
+      JuJu controller user
+    default: 'admin'
 
   docker_runtime:
     type: string

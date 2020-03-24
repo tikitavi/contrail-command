@@ -6,3 +6,6 @@ description: |
 series:
   - xenial
   - bionic
+requires:
+  contrail-controller:
+    interface: contrail-controller

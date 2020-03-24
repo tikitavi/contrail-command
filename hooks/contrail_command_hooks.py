@@ -8,6 +8,7 @@ from charmhelpers.core.hookenv import (
     UnregisteredHookError,
     config,
     log,
+    relation_get,
     status_set,
 )
 from charmhelpers.contrib.charmsupport import nrpe
@@ -39,12 +40,24 @@ def config_changed():
 @hooks.hook("update-status")
 def update_status():
     utils.update_charm_status()
-    utils.update_status()
 
 
 @hooks.hook("upgrade-charm")
 def upgrade_charm():
     utils.update_charm_status()
+
+
+@hooks.hook("contrail-controller-relation-joined")
+@hooks.hook("contrail-controller-relation-changed")
+def contrail_controller_changed():
+    data = relation_get()
+    if "orchestrator-info" in data:
+        config["orchestrator_info"] = data["orchestrator-info"]
+    else:
+        config.pop("orchestrator_info", None)
+    config.save()
+
+    utils.update_charm_status(import_cluster=True)
 
 
 def main():

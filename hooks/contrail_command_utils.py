@@ -30,7 +30,8 @@ BASE_CONFIGS_PATH = "/etc/contrail"
 
 CONFIGS_PATH = BASE_CONFIGS_PATH + "/contrail-command"
 IMAGES = [
-    "contrail-command-deployer"
+    "contrail-command-deployer",
+    "contrail-command"
 ]
 SERVICES = {}
 
@@ -62,7 +63,6 @@ def get_context():
 
 
 def deploy_ccd_code(image, tag):
-    docker_utils.pull(image, tag)
     docker_utils.remove_container_by_image(image)
 
     name = docker_utils.create(image, tag)
@@ -107,24 +107,44 @@ def update_charm_status(import_cluster=False):
 
     ctx = get_context()
 
-    if not ctx.get("cloud_orchestrator"):
-        status_set('blocked',
-                   'Missing cloud orchestrator info in relations.')
-        return
-    if ctx.get("cloud_orchestrator") != "openstack":
-        status_set('blocked',
-                   'Contrail command works with openstack only now')
-        return
+    for image in IMAGES:
+        try:
+            docker_utils.pull(image, tag)
+        except Exception as e:
+            log("Can't load image {}".format(e))
+            status_set('blocked',
+                       'Image could not be pulled: {}:{}'.format(image, tag))
+            return
 
+    deployer_image = "contrail-command-deployer"
     changed = common_utils.render_and_log("min_config.yaml",
         '/cluster_config.yml', ctx)
     env = common_utils.render_and_log("juju_environment",
         '/tmp/juju_environment', ctx)
     if changed or env or import_cluster:
-        for image in IMAGES:
-            deploy_ccd_code(image, tag)
-
-            dst='/' + image
-            check_call('. /tmp/juju_environment ; ' + dst + '/docker/deploy_contrail_command', shell=True)
+        deploy_ccd_code(deployer_image, tag)
+        if not ctx.get("cloud_orchestrator"):
+            status_set('blocked',
+                    'Missing cloud orchestrator info in relations.')
+            import_cluster = False
+        elif ctx.get("cloud_orchestrator") != "openstack":
+            status_set('blocked',
+                    'Contrail command works with openstack only now')
+            import_cluster = False
+        else:
+            import_cluster = True
+        run_contrail_command(deployer_image, import_cluster)
+        # do not update status if no relation to contrail-controller
+        if not import_cluster:
+            return
 
     update_status()
+
+
+def run_contrail_command(deployer_image, import_cluster):
+    dst='/' + deployer_image
+    export_env = 'export HOME=/root ; '
+    if import_cluster:
+        export_env = '. /tmp/juju_environment ; '
+
+    check_call(export_env + dst + '/docker/deploy_contrail_command', shell=True)

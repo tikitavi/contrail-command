@@ -41,11 +41,13 @@ options:
     description: |
       IP address of JuJu controller
       may be found by command `juju show-controller` (api-endpoints)
-  juju-cacert-path:
+  juju-ca-cert:
     type: string
     description: |
-      the path to JuJu CA certificate
+      base64-encoded SSL CA to Juju controller
       CA cert may be found by command `juju show-controller` (ca-cert)
+      save it to file and encode by command
+      `cat cert.pem | base64 > "cert.pem.b64"`
   juju-model-id:
     type: string
     description: |

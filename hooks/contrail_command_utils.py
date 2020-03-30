@@ -51,7 +51,7 @@ def get_context():
     ctx["delete_db"] = config.get("delete-db")
     ctx["persist_rules"] = config.get("persist-rules")
     ctx["juju_controller"] = config.get("juju-controller")
-    ctx["juju_cacert_path"] = config.get("juju-cacert-path")
+    ctx["juju_cacert_path"] = _decode_cert("juju-ca-cert")
     ctx["juju_model_id"] = config.get("juju-model-id")
     ctx["juju_controller_password"] = config.get("juju-controller-password")
     ctx["juju_controller_user"] = config.get("juju-controller-user")
@@ -60,6 +60,20 @@ def get_context():
 
     log("CTX: {}".format(ctx))
     return ctx
+
+
+def _decode_cert(key):
+    val = config.get(key)
+    if not val:
+        return None
+    try:
+        with open('/tmp/juju_ca_cert.pem', 'w') as f:
+            f.write(base64.b64decode(val).decode())
+        return '/tmp/juju_ca_cert.pem'
+    except Exception as e:
+        log("Couldn't decode certificate from config['{}']: {}".format(
+            key, str(e)), level=ERROR)
+    return None
 
 
 def deploy_ccd_code(image, tag):
